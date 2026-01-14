@@ -2,13 +2,13 @@
   "name": "@kohinata/adapter-qqbot",
   "version": "1.3.1",
   "description": "karin plugin adapter for qqbot",
-  "homepage": "https://github.com/KarinJS/karin-plugin-adapter-qqbot",
+  "homepage": "https://github.com/Kohinata-Iroha/kohinata-plugin-adapter-qqbot",
   "bugs": {
-    "url": "https://github.com/KarinJS/karin-plugin-adapter-qqbot/issues"
+    "url": "https://github.com/Kohinata-Iroha/kohinata-plugin-adapter-qqbot/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/KarinJS/karin-plugin-adapter-qqbot.git"
+    "url": "git+https://github.com/Kohinata-Iroha/kohinata-plugin-adapter-qqbot.git"
   },
   "author": "Kohinata Iroha",
   "type": "module",
