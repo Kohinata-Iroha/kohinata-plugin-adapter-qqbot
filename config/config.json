@@ -1,0 +1,35 @@
+[
+  {
+    "appId": "",
+    "secret": "",
+    "prodApi": "https://api.sgroup.qq.com",
+    "sandboxApi": "https://sandbox.api.sgroup.qq.com",
+    "tokenApi": "",
+    "sandbox": false,
+    "qqEnable": true,
+    "guildEnable": true,
+    "guildMode": 0,
+    "exclude": [],
+    "regex": [
+      {
+        "reg": "^/",
+        "rep": "#"
+      }
+    ],
+    "markdown": {
+      "mode": 0,
+      "id": "",
+      "kv": [
+        "text_start",
+        "img_dec",
+        "img_url",
+        "text_end"
+      ]
+    },
+    "event": {
+      "type": 0,
+      "wsUrl": "",
+      "wsToken": ""
+    }
+  }
+]
