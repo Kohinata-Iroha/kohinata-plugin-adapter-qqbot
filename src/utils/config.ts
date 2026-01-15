@@ -3,7 +3,7 @@ import path from 'node:path'
 import { dirPath } from '@/utils'
 import {
   watch,
-  basePath,
+  karinPathBase,
   requireFileSync,
   common,
 } from 'node-karin'
@@ -23,10 +23,10 @@ export const pkg = () => requireFileSync(`${dirPath}/package.json`)
 
 /** 用户配置的插件名称 */
 const pluginName = pkg().name
-/** 用户配置（统一使用 scope 目录结构：@karinjs/@kohinata/adapter-qqbot/config） */
-const dirConfig = path.join(basePath, pluginName, 'config')
+/** 用户配置（统一使用 scope 目录结构：@kohinata/adapter-qqbot/config） */
+const dirConfig = path.join(karinPathBase, pluginName, 'config')
 /** 旧路径兼容：@karinjs/@kohinata-adapter-qqbot/config */
-const legacyDirConfig = path.join(basePath, pkg().name.replace(/\//g, '-'), 'config')
+const legacyDirConfig = path.join(karinPathBase, pkg().name.replace(/\//g, '-'), 'config')
 
 /**
  * 迁移旧配置目录到新目录（一次性）

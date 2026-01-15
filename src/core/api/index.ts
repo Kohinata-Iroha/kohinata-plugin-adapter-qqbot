@@ -6,6 +6,8 @@ import type {
   Ark,
   DmsResponse,
   Embeds,
+  GenerateUrlLinkRequest,
+  GenerateUrlLinkResponse,
   GetMeResponse,
   GatewayInfo,
   Keyboard,
@@ -381,5 +383,20 @@ export class QQBotApi {
    */
   dms (recipientID: string, srcGuildID: string): Promise<DmsResponse> {
     return this.post('/users/@me/dms', { recipient_id: recipientID, source_guild_id: srcGuildID })
+  }
+
+  /**
+   * 获取机器人分享链接
+   * @param options 请求参数，可传入 callback_data 用于追踪来源归因
+   */
+  generateUrlLink (options?: GenerateUrlLinkRequest): Promise<GenerateUrlLinkResponse> {
+    const requestData: GenerateUrlLinkRequest = {}
+    if (options?.callback_data) {
+      // 确保 callback_data 不超过 32 字符
+      requestData.callback_data = options.callback_data.length > 32
+        ? options.callback_data.substring(0, 32)
+        : options.callback_data
+    }
+    return this.post('/v2/generate_url_link', requestData)
   }
 }

@@ -1,5 +1,5 @@
 {
-  "name": "@kohinata/adapter-qqbot",
+  "name": "@kohinata/karin-adapter-qqbot",
   "version": "1.3.3",
   "description": "karin plugin adapter for qqbot",
   "homepage": "https://github.com/Kohinata-Iroha/kohinata-plugin-adapter-qqbot",

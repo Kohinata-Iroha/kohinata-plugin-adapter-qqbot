@@ -1,4 +1,5 @@
 # Changelog
+## [1.3.1](获取机器人分享链接，召回消息) (2026-1-15)
 
 ## [1.3.1](https://github.com/KarinJS/karin-plugin-adapter-qqbot/compare/v1.3.0...v1.3.1) (2025-11-03)
 

@@ -21,6 +21,8 @@ export interface QQMessageID {
   msg_id?: string
   /** 回复消息的序号，与 msg_id 联合使用，避免相同消息id回复重复发送，不填默认是1。相同的 msg_id + msg_seq 重复发送会失败。 */
   msg_seq?: number
+  /** 指明发送消息为互动召回消息，与 msg_id、event_id 互斥使用 */
+  is_wakeup?: boolean
 }
 
 /** 发送QQ文本消息请求参数 */
@@ -290,4 +292,16 @@ export interface UploadMediaResponse {
   ttl: number
   /** 发送消息的唯一ID，当srv_send_msg设置为true时返回 */
   id: string
+}
+
+/** 生成机器人分享链接请求参数 */
+export interface GenerateUrlLinkRequest {
+  /** 添加好友时会回传该参数给到开发者，最大32字符 */
+  callback_data?: string
+}
+
+/** 生成机器人分享链接响应 */
+export interface GenerateUrlLinkResponse {
+  /** 生成的分享链接 */
+  url: string
 }
