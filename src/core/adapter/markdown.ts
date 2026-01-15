@@ -36,10 +36,12 @@ export class AdapterQQBotMarkdown extends AdapterQQBot {
   /**
    * 处理文本 将文本中的链接转为二维码
    * @param text 文本
-   * @returns 处理后的文本和二维码 二维码为不带`base64://`的字符串
+   * @returns 处理后的文本和二维码 二维码为不带`base64://`的字符串，如果多个二维码合并失败，返回第一个二维码
    */
-  async hendleText (text: string): Promise<{ text: string, qr: string | null }> {
-    const urls = handleUrl(text)
+  async hendleText (text: string): Promise<{ text: string, qr: string | null, qrs?: string[] }> {
+    // 使用配置的白名单过滤 URL
+    const exclude = this._config?.exclude || []
+    const urls = handleUrl(text, exclude)
     if (!urls.length) return { text, qr: null }
 
     urls.forEach((url) => {
@@ -48,9 +50,18 @@ export class AdapterQQBotMarkdown extends AdapterQQBot {
 
     const list = await qrs(urls)
 
+    // 单个二维码直接返回
     if (list.length === 1) return { text, qr: list[0] }
-    const result = await common.mergeImage(list, 3)
-    return { text, qr: result.base64 }
+
+    // 多个二维码尝试合并，失败则返回所有二维码列表
+    try {
+      const result = await common.mergeImage(list, 3)
+      return { text, qr: result.base64 }
+    } catch (error) {
+      // 合并失败（可能是 ffmpeg 不可用），返回所有二维码列表，让调用方逐个发送
+      this.logger('warn', `二维码合并失败，将发送 ${list.length} 个单独的二维码:`, error)
+      return { text, qr: null, qrs: list }
+    }
   }
 
   /**

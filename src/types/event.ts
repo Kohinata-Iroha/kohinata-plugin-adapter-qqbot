@@ -548,6 +548,10 @@ export interface FriendAddEvent extends BaseEvent {
     timestamp: number,
     /** 添加机器人的用户openid */
     openid: string,
+    /** 添加机器人的用户union_openid（可选） */
+    author?: {
+      union_openid: string
+    }
   },
 }
 
@@ -564,6 +568,10 @@ export interface FriendDelEvent extends BaseEvent {
     timestamp: number,
     /** 删除机器人的用户openid */
     openid: string,
+    /** 删除机器人的用户union_openid（可选） */
+    author?: {
+      union_openid: string
+    }
   },
 }
 

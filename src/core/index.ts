@@ -9,7 +9,7 @@ import { AdapterQQBotMarkdown } from '@/core/adapter/markdown'
 import { createAxiosInstance, getAccessToken } from '@/core/internal/axios'
 import { GraphicTemplateMarkdown, rawMarkdown } from '@/core/adapter/handler'
 import { onChannelMsg, onDirectMsg, onFriendMsg, onGroupMsg } from '@/core/event/message'
-import { onGroupAddRobot, onGroupDelRobot } from '@/core/event/notice'
+import { onGroupAddRobot, onGroupDelRobot, onFriendAdd, onFriendDel, onC2CMsgReceive, onC2CMsgReject, onGroupMsgReceive, onGroupMsgReject } from '@/core/event/notice'
 import { createWebSocketConnection, stopWebSocketConnection } from '@/connection/webSocket'
 
 import type { QQBotConfig } from '@/types/config'
@@ -28,7 +28,13 @@ import type {
   MessageReactionRemoveEvent,
   GuildMessageDeleteEvent,
   PublicMessageDeleteEvent,
-  DirectMessageDeleteEvent
+  DirectMessageDeleteEvent,
+  FriendAddEvent,
+  FriendDelEvent,
+  C2CMsgReceiveEvent,
+  C2CMsgRejectEvent,
+  GroupMsgReceiveEvent,
+  GroupMsgRejectEvent
 } from '@/types/event'
 
 /**
@@ -173,7 +179,7 @@ const createClient = (cfg: QQBotConfig, api: QQBotApi): AdapterQQBotNormal | Ada
 
   // 模式 0: 正常模式
   if (mode === 0) {
-    return new AdapterQQBotNormal(api)
+    return new AdapterQQBotNormal(api, cfg)
   }
 
   // 模式 1: 原生Markdown
@@ -187,7 +193,7 @@ const createClient = (cfg: QQBotConfig, api: QQBotApi): AdapterQQBotNormal | Ada
   }
 
   // 默认返回正常模式
-  return new AdapterQQBotNormal(api)
+  return new AdapterQQBotNormal(api, cfg)
 }
 
 /**
@@ -333,6 +339,18 @@ export const createEvent = (
       return onGroupAddRobot(client, event)
     case EventEnum.GROUP_DEL_ROBOT:
       return onGroupDelRobot(client, event)
+    case EventEnum.FRIEND_ADD:
+      return onFriendAdd(client, event as FriendAddEvent)
+    case EventEnum.FRIEND_DEL:
+      return onFriendDel(client, event as FriendDelEvent)
+    case EventEnum.C2C_MSG_RECEIVE:
+      return onC2CMsgReceive(client, event as C2CMsgReceiveEvent)
+    case EventEnum.C2C_MSG_REJECT:
+      return onC2CMsgReject(client, event as C2CMsgRejectEvent)
+    case EventEnum.GROUP_MSG_RECEIVE:
+      return onGroupMsgReceive(client, event as GroupMsgReceiveEvent)
+    case EventEnum.GROUP_MSG_REJECT:
+      return onGroupMsgReject(client, event as GroupMsgRejectEvent)
     default:
       logger.error(`未知事件类型: ${JSON.stringify(event)}`)
   }

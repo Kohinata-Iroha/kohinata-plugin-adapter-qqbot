@@ -4,6 +4,8 @@ import { common, fileToUrl } from 'node-karin'
 import { AdapterQQBot } from '@/core/adapter/adapter'
 import { SendGuildMsg, SendQQMsg } from '@/core/api/types'
 import type { Contact, ElementTypes, Message, SendMsgResults } from 'node-karin'
+import type { QQBotConfig } from '@/types/config'
+import type { QQBotApi } from '@/core/api'
 
 /**
  * 检测图片类型并返回文件名和 Content-Type
@@ -60,6 +62,12 @@ function detectImageType (buffer: Buffer, filePath?: string): { filename: string
 
 /** 正常发送消息 */
 export class AdapterQQBotNormal extends AdapterQQBot {
+  _config: QQBotConfig
+  constructor (QQBot: QQBotApi, config: QQBotConfig) {
+    super(QQBot)
+    this._config = config
+  }
+
   async srcReply (e: Message, elements: ElementTypes[]) {
     return this.sendMsg(e.contact, elements)
   }
@@ -77,10 +85,12 @@ export class AdapterQQBotNormal extends AdapterQQBot {
   /**
    * 处理文本 将文本中的链接转为二维码
    * @param text 文本
-   * @returns 处理后的文本和二维码 二维码为不带`base64://`的字符串
+   * @returns 处理后的文本和二维码 二维码为不带`base64://`的字符串，如果多个二维码合并失败，返回第一个二维码
    */
-  async hendleText (text: string): Promise<{ text: string, qr: string | null }> {
-    const urls = handleUrl(text)
+  async hendleText (text: string): Promise<{ text: string, qr: string | null, qrs?: string[] }> {
+    // 使用配置的白名单过滤 URL
+    const exclude = this._config?.exclude || []
+    const urls = handleUrl(text, exclude)
     if (!urls.length) return { text, qr: null }
 
     urls.forEach((url) => {
@@ -89,9 +99,18 @@ export class AdapterQQBotNormal extends AdapterQQBot {
 
     const list = await qrs(urls)
 
+    // 单个二维码直接返回
     if (list.length === 1) return { text, qr: list[0] }
-    const result = await common.mergeImage(list, 3)
-    return { text, qr: result.base64 }
+
+    // 多个二维码尝试合并，失败则返回所有二维码列表
+    try {
+      const result = await common.mergeImage(list, 3)
+      return { text, qr: result.base64 }
+    } catch (error) {
+      // 合并失败（可能是 ffmpeg 不可用），返回所有二维码列表，让调用方逐个发送
+      this.logger('warn', `二维码合并失败，将发送 ${list.length} 个单独的二维码:`, error)
+      return { text, qr: null, qrs: list }
+    }
   }
 
   /**
@@ -112,9 +131,16 @@ export class AdapterQQBotNormal extends AdapterQQBot {
 
     for (const v of elements) {
       if (v.type === 'text') {
-        const { text, qr } = await this.hendleText(v.text)
+        const { text, qr, qrs } = await this.hendleText(v.text)
         list.content.push(text)
-        if (qr) list.image.push(qr)
+        if (qr) {
+          list.image.push(qr)
+        } else if (qrs && qrs.length > 0) {
+          // 合并失败，逐个添加二维码
+          qrs.forEach((qrItem) => {
+            list.image.push(qrItem)
+          })
+        }
         continue
       }
 
@@ -256,9 +282,16 @@ export class AdapterQQBotNormal extends AdapterQQBot {
 
     for (const v of elements) {
       if (v.type === 'text') {
-        const { text, qr } = await this.hendleText(v.text)
+        const { text, qr, qrs } = await this.hendleText(v.text)
         list.content.push(text)
-        if (qr) list.image.push(qr)
+        if (qr) {
+          list.image.push(qr)
+        } else if (qrs && qrs.length > 0) {
+          // 合并失败，逐个添加二维码
+          qrs.forEach((qrItem) => {
+            list.image.push(qrItem)
+          })
+        }
         continue
       }
 
