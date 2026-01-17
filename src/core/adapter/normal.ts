@@ -1,5 +1,5 @@
 import FormData from 'form-data'
-import { handleUrl, qrs } from '@/utils/common'
+import { qrs } from '@/utils/common'
 import { common, fileToUrl } from 'node-karin'
 import { AdapterQQBot } from '@/core/adapter/adapter'
 import { SendGuildMsg, SendQQMsg } from '@/core/api/types'
@@ -85,32 +85,67 @@ export class AdapterQQBotNormal extends AdapterQQBot {
   /**
    * 处理文本 将文本中的链接转为二维码
    * @param text 文本
-   * @returns 处理后的文本和二维码 二维码为不带`base64://`的字符串
+   * @returns 处理后的文本和二维码列表 二维码为不带`base64://`的字符串
    */
-  async hendleText (text: string): Promise<{ text: string, qr: string | null }> {
+  async hendleText (text: string): Promise<{ text: string, qrs: string[] }> {
+    // 检查是否启用转二维码功能
+    if (this._config?.enableConvert === false) {
+      return { text, qrs: [] }
+    }
+
+    // 使用正则表达式匹配URL（匹配 http:// 或 https:// 开头的URL）
+    const urlRegex = /https?:\/\/[^\s\u4e00-\u9fa5]+/g
+    const matches = text.match(urlRegex)
+
+    if (!matches || matches.length === 0) {
+      return { text, qrs: [] }
+    }
+
     // 使用配置的白名单过滤 URL
     const exclude = this._config?.exclude || []
-    const urls = handleUrl(text, exclude)
-    if (!urls.length) return { text, qr: null }
+    const urls: string[] = []
 
-    urls.forEach((url) => {
-      text = text.replace(new RegExp(url, 'g'), '[请扫码查看]')
-    })
+    for (const url of matches) {
+      // 检查是否在白名单中
+      const isExcluded = exclude.some(ex => {
+        try {
+          const regex = new RegExp(ex.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')
+          return regex.test(url)
+        } catch {
+          return url.includes(ex)
+        }
+      })
 
-    const list = await qrs(urls)
-
-    // 单个二维码直接返回
-    if (list.length === 1) return { text, qr: list[0] }
-
-    // 多个二维码尝试合并，失败时记录错误并返回第一个二维码
-    try {
-      const result = await common.mergeImage(list, 3)
-      return { text, qr: result.base64 }
-    } catch (error) {
-      // 合并失败（可能是 ffmpeg 不可用），记录错误并返回第一个二维码
-      this.logger('error', '二维码合并失败，将使用第一个二维码:', error)
-      return { text, qr: list[0] }
+      if (!isExcluded) {
+        urls.push(url)
+      }
     }
+
+    if (urls.length === 0) {
+      return { text, qrs: [] }
+    }
+
+    // 生成二维码
+    const qrList: string[] = []
+    for (const url of urls) {
+      try {
+        const qrCode = await qrs([url])
+        if (qrCode.length > 0) {
+          qrList.push(qrCode[0])
+        }
+      } catch (error) {
+        this.logger('error', `[QQBot] URL转二维码失败: ${url}`, error)
+      }
+    }
+
+    // 替换文本中的URL为提示文字
+    for (const url of urls) {
+      const escapedUrl = url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      text = text.replace(new RegExp(escapedUrl, 'g'), '[链接(请扫码查看)]')
+    }
+
+    // 返回所有二维码，分别发送（不使用ffmpeg合并）
+    return { text, qrs: qrList }
   }
 
   /**
@@ -131,9 +166,12 @@ export class AdapterQQBotNormal extends AdapterQQBot {
 
     for (const v of elements) {
       if (v.type === 'text') {
-        const { text, qr } = await this.hendleText(v.text)
+        const { text, qrs } = await this.hendleText(v.text)
         list.content.push(text)
-        if (qr) list.image.push(qr)
+        // 将所有二维码添加到图片列表，分别发送（不使用ffmpeg）
+        if (qrs.length > 0) {
+          list.image.push(...qrs)
+        }
         continue
       }
 
@@ -213,7 +251,8 @@ export class AdapterQQBotNormal extends AdapterQQBot {
     /** 返回值 */
     const rawData = this.initSendMsgResults()
 
-    /** 处理被动消息 */
+    /** 处理被动消息 - 为每条消息生成唯一的 msg_seq（默认自动递增） */
+    let msgSeqCounter = 0
     const pasmsg = (() => {
       // 如果设置了 is_wakeup 且是好友场景，直接返回设置 is_wakeup 的函数
       if (list.pasmsg.is_wakeup && contact.scene === 'friend') {
@@ -222,19 +261,25 @@ export class AdapterQQBotNormal extends AdapterQQBot {
         }
       }
 
-      if (!list.pasmsg.msg_id) return () => ''
-
-      list.pasmsg.msg_seq++
-      if (list.pasmsg.type === 'msg') {
+      // 如果没有 msg_id，使用时间戳 + 计数器确保唯一性
+      if (!list.pasmsg.msg_id) {
+        const baseSeq = Date.now() % 0xFFFFFFFF
         return (item: SendQQMsg) => {
-          item.msg_seq = list.pasmsg.msg_seq
-          item.msg_id = list.pasmsg.msg_id
+          item.msg_seq = baseSeq + msgSeqCounter++
         }
       }
 
+      // 有 msg_id 的情况，自动递增 msg_seq
+      const baseSeq = list.pasmsg.msg_seq
       return (item: SendQQMsg) => {
-        item.msg_seq = list.pasmsg.msg_seq
-        item.event_id = list.pasmsg.msg_id
+        const currentSeq = baseSeq + msgSeqCounter++
+        if (list.pasmsg.type === 'msg') {
+          item.msg_seq = currentSeq
+          item.msg_id = list.pasmsg.msg_id
+        } else {
+          item.msg_seq = currentSeq
+          item.event_id = list.pasmsg.msg_id
+        }
       }
     })()
 
@@ -275,9 +320,14 @@ export class AdapterQQBotNormal extends AdapterQQBot {
 
     for (const v of elements) {
       if (v.type === 'text') {
-        const { text, qr } = await this.hendleText(v.text)
+        const { text, qrs } = await this.hendleText(v.text)
         list.content.push(text)
-        if (qr) list.image.push(qr)
+        // 频道场景使用 imageFiles，base64 图片需要通过 FormData 上传
+        if (qrs.length > 0) {
+          qrs.forEach(qr => {
+            list.imageFiles.push(qr)
+          })
+        }
         continue
       }
 

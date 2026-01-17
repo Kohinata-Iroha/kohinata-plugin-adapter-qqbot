@@ -2,7 +2,7 @@
   "name": "@kohinata/karin-adapter-qqbot",
   "version": "1.3.7",
   "description": "karin plugin adapter for qqbot",
-  "homepage": "https://github.com/Kohinata-Iroha/kohinata-karin-adapter-qqbot",
+  "homepage": "https://github.com/Kohinata-Iroha",
   "bugs": {
     "url": "https://github.com/Kohinata-Iroha/kohinata-karin-adapter-qqbot/issues"
   },

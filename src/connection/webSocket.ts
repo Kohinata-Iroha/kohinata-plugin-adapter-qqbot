@@ -10,7 +10,7 @@ import type { AdapterQQBotMarkdown } from '@/core/adapter/markdown'
 
 /**
  * 缓存连接
- * - 每个 appId 只允许一个“当前有效”的连接（通过 connectionId 做标识）
+ * - 每个 appId 只允许一个"当前有效"的连接（通过 connectionId 做标识）
  */
 type WSConnection = {
   socket: WebSocket
@@ -24,6 +24,61 @@ const cache = new Map<string, WSConnection>()
  * 连接尝试序号（用于丢弃过期的并发连接尝试）
  */
 const attemptSeq = new Map<string, number>()
+/**
+ * 重连尝试次数记录（用于自动重连）
+ */
+const reconnectAttempts = new Map<string, number>()
+
+/**
+ * 尝试自动重连（最多5次）
+ */
+const attemptReconnect = async (
+  config: QQBotConfig,
+  client: AdapterQQBotNormal | AdapterQQBotMarkdown,
+  currentAttempt: number
+) => {
+  const appid = config.appId
+  const maxAttempts = 5
+
+  // 清除重连计数（如果连接成功）
+  const clearReconnectCount = () => {
+    reconnectAttempts.delete(appid)
+  }
+
+  // 如果已达到最大重连次数，停止重连
+  if (currentAttempt >= maxAttempts) {
+    logger.error('[QQBot]', `${appid}: 已达到最大重连次数 (${maxAttempts})，停止重连`)
+    reconnectAttempts.delete(appid)
+    return
+  }
+
+  const attempt = currentAttempt + 1
+  reconnectAttempts.set(appid, attempt)
+
+  logger.debug('[QQBot]', `${appid}: 开始第 ${attempt}/${maxAttempts} 次重连尝试`)
+
+  // 等待一段时间后重连（指数退避：1s, 2s, 4s, 8s, 16s）
+  const delay = Math.min(1000 * Math.pow(2, currentAttempt), 16000)
+  await new Promise(resolve => setTimeout(resolve, delay))
+
+  // 检查是否还有重连记录（可能已被手动停止）
+  if (reconnectAttempts.get(appid) !== attempt) {
+    return
+  }
+
+  // 尝试重新连接
+  const success = await createWebSocketConnection(config, client)
+
+  if (!success) {
+    // 连接失败，继续重连
+    logger.warn('[QQBot]', `${appid}: 第 ${attempt} 次重连失败，将在 ${Math.min(1000 * Math.pow(2, attempt), 16000)}ms 后重试`)
+    attemptReconnect(config, client, attempt)
+  } else {
+    // 连接成功，清除重连计数
+    clearReconnectCount()
+    logger.debug('[QQBot]', `${appid}: 第 ${attempt} 次重连成功`)
+  }
+}
 
 /**
  * 创建websocket连接
@@ -103,6 +158,7 @@ export const createWebSocketConnection = async (
 
         let heartbeatInterval = 0
         let lastSeq = 0
+        let isReady = false // 标记是否已成功建立连接
 
         /**
          * 关闭连接
@@ -130,10 +186,15 @@ export const createWebSocketConnection = async (
           }
         }
 
-        socket.on('close', () => {
+        socket.on('close', (code, reason) => {
           if (isStale()) return
+          const wasReady = isReady
           close(false)
           resolveOnce(false)
+          // 如果连接已成功建立过（收到过 READY），且不是主动关闭，则尝试重连
+          if (wasReady && code !== 1000 && code !== 1001) {
+            attemptReconnect(config, client, 0)
+          }
         })
 
         socket.on('error', (error) => {
@@ -168,6 +229,7 @@ export const createWebSocketConnection = async (
 
           // 處理 READY 事件，標記連接成功
           if (data.op === Opcode.Dispatch && data.t === 'READY') {
+            isReady = true
             logger.debug('[QQBot]', `${appid}: WebSocket 連接成功，收到 READY 事件`)
             resolveOnce(true)
           }
@@ -295,6 +357,8 @@ const handleWebSocketMessage = (
     case Opcode.Reconnect:
       logger.warn('[QQBot]', `${appid}: 服务器要求重连`)
       socket.close()
+      // 触发自动重连
+      attemptReconnect(config, client, 0)
       break
 
     case Opcode.InvalidSession:
@@ -305,12 +369,15 @@ const handleWebSocketMessage = (
     default:
       logger.debug('[QQBot]', `${appid}: 未知OpCode: ${op}`)
   }
-}/**
+}
+/**
  * 停止已有连接
  */
 export const stopWebSocketConnection = (appid: string) => {
   // 让当前/后续 in-flight 连接尝试失效
   attemptSeq.set(appid, (attemptSeq.get(appid) || 0) + 1)
+  // 清除重连计数
+  reconnectAttempts.delete(appid)
   const result = cache.get(appid)
   if (result) {
     // 傳遞 true 表示主動關閉，不觸發重連

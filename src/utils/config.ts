@@ -158,6 +158,7 @@ export const formatConfig = (user: Config): Config => {
         ...def.markdown,
         ...item.markdown,
       },
+      enableConvert: item.enableConvert !== undefined ? item.enableConvert : def.enableConvert,
     }
     result.push(formatted)
   })
@@ -208,6 +209,7 @@ export const getDefaultConfig = (): Config => [
       wsUrl: 'wss://sandbox.api.sgroup.qq.com/websocket/',
       wsToken: '',
     },
+    enableConvert: true,
   },
 ]
 

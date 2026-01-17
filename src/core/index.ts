@@ -37,17 +37,10 @@ import type {
   GroupMsgRejectEvent
 } from '@/types/event'
 
-/**
- * 追蹤已創建的 Bot 實例（以 appId 為唯一鍵）。
- * 注意：node-karin 沒有提供對應的 unregister 能力時，重複 registerBot 會造成「看起來多出一個 Bot」。
- * 因此這裡保證：同一個 appId 只會 registerBot 一次，後續配置變更只做“更新/重連”。
- */
 type BotInstance = {
   client: AdapterQQBotNormal | AdapterQQBotMarkdown
   config: QQBotConfig
-  /** 是否已經向 node-karin registerBot 過（避免重複註冊） */
   registered: boolean
-  /** 已註冊的類型（避免配置切換導致重複註冊） */
   registeredType: 'webSocketClient' | 'http' | null
 }
 export const botInstances = new Map<string, BotInstance>()

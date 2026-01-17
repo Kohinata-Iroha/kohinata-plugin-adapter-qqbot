@@ -50,6 +50,8 @@ export interface QQBotConfig {
     /** ws服务器鉴权token */
     wsToken: string
   }
+  /** 是否启用文本中的url转二维码功能，默认 true（开启） */
+  enableConvert?: boolean
 }
 
 /** `config.json` 文件的类型定义 */

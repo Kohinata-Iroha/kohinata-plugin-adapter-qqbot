@@ -38,6 +38,7 @@ export default defineConfig({
           markdownId: item.markdown?.id || '',
           markdownKv: Array.isArray(item.markdown?.kv) ? item.markdown.kv.filter((k: any) => k != null && String(k).trim() !== '').map((k: any) => String(k)) : [],
           eventType: item.event?.type !== undefined ? String(item.event.type) : '2',
+          enableConvert: item.enableConvert !== undefined ? Boolean(item.enableConvert) : true,
         })
       })
 
@@ -61,6 +62,11 @@ export default defineConfig({
                   label: 'Secret',
                   description: '请输入你的Secret',
                   isRequired: true,
+                }),
+                components.switch.create('enableConvert', {
+                  label: '文本中的url转二维码',
+                  description: '是否启用文本中的url转二维码功能',
+                  defaultSelected: true,
                 }),
                 components.switch.create('sandbox', {
                   label: '沙盒环境',
@@ -183,6 +189,7 @@ export default defineConfig({
       markdownId: string
       markdownKv: string[]
       eventType: 0 | 1 | 2 | string | number
+      enableConvert: boolean
     }>
   }) => {
     try {
@@ -250,6 +257,7 @@ export default defineConfig({
             wsUrl: DEFAULT_WS_URL,
             wsToken: DEFAULT_WS_TOKEN,
           },
+          enableConvert: item.enableConvert !== undefined ? Boolean(item.enableConvert) : true,
         })
       })
 
